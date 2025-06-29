@@ -5,7 +5,6 @@ import * as bcrypts from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ConstantCodes } from 'src/common/constants';
-import { constants } from 'buffer';
 
 @Injectable()
 export class AuthService {
@@ -25,7 +24,6 @@ export class AuthService {
     //check password match
     const isMatch = await bcrypts.compare(pw, admin.pw);
     if (!isMatch) return messages.PASSWORD_INCORRECT;
-
     // generate Active token valid for 1 day
     const { token } = await this.adminGenerateToken(
       admin.email,
@@ -62,10 +60,12 @@ export class AuthService {
       return messages.TOKEN_VERIFICATION_FAILED;
     }
   }
+
   //Get user info by email
   async getUserInfo(email: string) {
     return await this.Prisma.users.findUnique({ where: { email } });
   }
+
   // User sign in 
   async userSignIn(email: string, pw: string) {
     //Check null
@@ -76,7 +76,6 @@ export class AuthService {
     //check password match
     const isMatch = await bcrypts.compare(pw, user.pw);
     if (!isMatch) return messages.PASSWORD_INCORRECT;
-
     // generate Active token valid for 1 day and refresh token valid for 7 days
     const { token, refresh_token } = await this.generateToken(
       user.email,
@@ -87,6 +86,7 @@ export class AuthService {
     const { pw: _, ...user_info } = user;
     return { user_info, token, refresh_token }
   }
+
   //Generate Token & refresh token valid in 7 days
   async generateToken(email: string, first_name: string, last_name: string) {
     //Generate Access Token expire in 1 day
@@ -103,6 +103,7 @@ export class AuthService {
     });
     return { token, refresh_token }
   }
+
   //Verify token
   async verifyToken(token: string, secret_code: string) {
     try {
@@ -133,6 +134,7 @@ export class AuthService {
       return error.name;
     }
   }
+
   //Refresh token
   async refreshToken(current_refresh_token: string, secret_code: string) {
     try {
@@ -147,6 +149,5 @@ export class AuthService {
       return { user_info, token, refresh_token };
     }
     catch { return messages.TOKEN_VERIFICATION_FAILED; }
-
   }
 }
