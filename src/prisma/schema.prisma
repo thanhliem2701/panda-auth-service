@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model brands {
+  id            Int         @id @default(autoincrement())
+  brand_name    String      @db.VarChar(20)
+  address       String?     @db.VarChar(100)
+  imgurl        String?
+  display_order Int?
+  tag           String?     @db.VarChar(100)
+  category_id   Int?
+  enabled       Boolean?    @default(true)
+  created_at    DateTime?   @default(now()) @db.Timestamp(6)
+  updated_at    DateTime?   @default(now()) @db.Timestamp(6)
+  categories    categories? @relation(fields: [category_id], references: [id], onUpdate: NoAction, map: "fk_category")
+  products      products[]
+}
+
+model categories {
+  id            Int        @id @default(autoincrement())
+  category_name String     @db.VarChar(20)
+  menu_id       Int
+  imgurl        String?
+  display_order Int?
+  tag           String?
+  enabled       Boolean?   @default(true)
+  created_at    DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at    DateTime?  @default(now()) @db.Timestamp(6)
+  brands        brands[]
+  side_menus    side_menus @relation(fields: [menu_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_menu")
+  products      products[]
+}
+
+model category_banners {
+  id          Int         @id @default(autoincrement())
+  banner_name String?     @db.VarChar(20)
+  imgurl      String?
+  detail_link String?
+  menu_id     Int?
+  enabled     Boolean?    @default(true)
+  created_at  DateTime?   @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?   @default(now()) @db.Timestamp(6)
+  side_menus  side_menus? @relation(fields: [menu_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model partners {
+  id           Int        @id @default(autoincrement())
+  partner_name String     @db.VarChar(50)
+  imgurl       String?
+  address      String?    @db.VarChar(100)
+  tel          String?    @db.VarChar(20)
+  origin       String?    @db.VarChar(20)
+  enabled      Boolean?   @default(true)
+  created_at   DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at   DateTime?  @default(now()) @db.Timestamp(6)
+  products     products[]
+}
+
+model prices {
+  id              Int       @id @default(autoincrement())
+  ori_price       Decimal   @db.Decimal(10, 2)
+  sell_price      Decimal   @db.Decimal(10, 2)
+  valid_from      DateTime? @db.Date
+  valid_to        DateTime? @db.Date
+  promotion       Boolean?  @default(false)
+  discount_percen Decimal?  @db.Decimal(5, 2)
+  discount_value  Decimal?  @db.Decimal(10, 2)
+  product_id      Int?
+  enabled         Boolean?  @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  updated_at      DateTime? @default(now()) @db.Timestamp(6)
+  products        products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_price_product")
+}
+
+model product_detail {
+  id          Int       @id @default(autoincrement())
+  description Json?     @db.Json
+  product_id  Int?
+  enabled     Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+  products    products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_product_detail")
+}
+
+model product_imgs {
+  id         Int       @id @default(autoincrement())
+  imgurl     String
+  product_id Int?
+  enabled    Boolean?  @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_product_img")
+}
+
+model products {
+  id             Int              @id @default(autoincrement())
+  product_name   String           @db.VarChar(50)
+  category_id    Int?
+  brand_id       Int?
+  origin         String?          @db.VarChar(20)
+  manufacturer   String?          @db.VarChar(20)
+  distributor_id Int?
+  tag            String?          @db.VarChar(100)
+  num_of_sell    Int?
+  enabled        Boolean?         @default(true)
+  created_at     DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamp(6)
+  prices         prices[]
+  product_detail product_detail[]
+  product_imgs   product_imgs[]
+  brands         brands?          @relation(fields: [brand_id], references: [id], onUpdate: NoAction, map: "fk_product_brand")
+  categories     categories?      @relation(fields: [category_id], references: [id], onUpdate: NoAction, map: "fk_product_category")
+  partners       partners?        @relation(fields: [distributor_id], references: [id], onUpdate: NoAction, map: "fk_product_distributor")
+  rating         rating[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model rating {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  product_id   Int
+  stars        Int?
+  user_comment String?
+  enabled      Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  updated_at   DateTime? @default(now()) @db.Timestamp(6)
+  products     products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rating_product")
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rating_user")
+
+  @@unique([user_id, product_id], map: "unique_user_product_rating")
+}
+
+model side_menus {
+  id               Int                @id @default(autoincrement())
+  menu_name        String             @db.VarChar(50)
+  imgurl           String?
+  display_order    Int?
+  tag              String?
+  enabled          Boolean?           @default(true)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
+  categories       categories[]
+  category_banners category_banners[]
+}
+
+model top_banners {
+  id          Int       @id @default(autoincrement())
+  banner_name String?   @db.VarChar(50)
+  imgurl      String?
+  detail_link String?
+  enabled     Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model user_admin {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(50)
+  pw            String
+  first_name    String?   @db.VarChar(20)
+  last_name     String?   @db.VarChar(20)
+  date_of_birth DateTime? @db.Date
+  phone         String?   @db.VarChar(20)
+  role          String?   @db.VarChar(20)
+  enabled       Boolean?  @default(true)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model users {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(50)
+  first_name    String?   @db.VarChar(20)
+  last_name     String?   @db.VarChar(20)
+  date_of_birth DateTime? @db.Date
+  phone         String?   @db.VarChar(20)
+  address       String?   @db.VarChar(100)
+  delivery      Json?     @db.Json
+  enabled       Boolean?  @default(true)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+  pw            String
+  rating        rating[]
+}
