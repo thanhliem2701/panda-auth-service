@@ -6,16 +6,16 @@ import { ConfigService } from '@nestjs/config';
 async function bootstrap() {
   const appContext = await NestFactory.createApplicationContext(AppModule);
   const configService = appContext.get(ConfigService);
-  const rabbitUrl = configService.get<string>('AMQP_URL');
-  const queueName = configService.get<string>('AMQP_QUEUE');
-  if (!rabbitUrl) {
-    throw new Error('RABBITMQ_URL is not defined in the configuration');
+  const amqp_url = configService.get<string>('AMQP_URL');
+  const amqp_queue = configService.get<string>('AMQP_QUEUE');
+  if (!amqp_url) {
+    throw new Error('AMQP_URL is not defined in the configuration');
   }
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule,{
     transport: Transport.RMQ,
     options:{
-      urls:[rabbitUrl],
-      queue: queueName,
+      urls:[amqp_url],
+      queue: amqp_queue,
       queueOptions:{
         durable:true,
       }
