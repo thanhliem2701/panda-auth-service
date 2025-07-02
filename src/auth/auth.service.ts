@@ -17,13 +17,13 @@ export class AuthService {
   //Admin Sign In
   async adminSignIn(email: string, pw: string) {
     //check null
-    if (!email || !pw) return messages.EMAIL_PASSWORD_NULL
+    if (!email || !pw) return { success: false, messages: messages.EMAIL_PASSWORD_NULL }
     //check email exist
     const admin = await this.Prisma.user_admin.findUnique({ where: { email } });
-    if (!admin) return messages.EMAIL_NOT_FOUND;
+    if (!admin) return { success: false, messages: messages.EMAIL_NOT_FOUND };
     //check password match
     const isMatch = await bcrypts.compare(pw, admin.pw);
-    if (!isMatch) return messages.PASSWORD_INCORRECT;
+    if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day
     const { token } = await this.adminGenerateToken(
       admin.email,
@@ -32,7 +32,7 @@ export class AuthService {
     )
     //take out password before return to client
     const { pw: _, ...admin_info } = admin;
-    return { admin_info, token }
+    return { success: true, data: { admin_info, token } }
   }
 
   //generate token expire in 1 day
@@ -52,30 +52,30 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(token, { secret: this.configService.get<string>(ConstantCodes.JWT_SECRET_KEY) });
       // get user admin info
       const admin = await this.Prisma.user_admin.findUnique({ where: { email: payload.data.email } });
-      if (!admin) return messages.TOKEN_VERIFICATION_FAILED;
+      if (!admin) return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED };
       const { pw: _, ...admin_info } = admin;
-      return admin_info;
+      return { success: true, data: { admin_info } }
     }
     catch {
-      return messages.TOKEN_VERIFICATION_FAILED;
+      return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
     }
   }
 
   //Get user info by email
   async getUserInfo(email: string) {
-    return await this.Prisma.users.findUnique({ where: { email } });
+    return await this.Prisma.users.findUnique({ where: { email } })
   }
 
   // User sign in 
   async userSignIn(email: string, pw: string) {
     //Check null
-    if (!email || !pw) return messages.EMAIL_PASSWORD_NULL
+    if (!email || !pw) return { success: false, messages: messages.EMAIL_PASSWORD_NULL };
     //check email exist
     const user = await this.getUserInfo(email);
-    if (!user) return messages.EMAIL_NOT_FOUND;
+    if (!user) return { success: false, messages: messages.EMAIL_NOT_FOUND }
     //check password match
     const isMatch = await bcrypts.compare(pw, user.pw);
-    if (!isMatch) return messages.PASSWORD_INCORRECT;
+    if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day and refresh token valid for 7 days
     const { token, refresh_token } = await this.generateToken(
       user.email,
@@ -84,7 +84,7 @@ export class AuthService {
     )
     //take out password before return to client
     const { pw: _, ...user_info } = user;
-    return { user_info, token, refresh_token }
+    return { success: true, data: { user_info, token, refresh_token } }
   }
 
   //Generate Token & refresh token valid in 7 days
@@ -113,25 +113,25 @@ export class AuthService {
           // Get user info/sign in again
           const user = await this.getUserInfo(accessPayload.data.email);
           if (!user) {
-            return messages.TOKEN_VERIFICATION_FAILED;
+            return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
           }
           const { pw: _, ...user_info } = user;
-          return user_info;
+          return { success: true, data: { user_info } }
         case ConstantCodes.REFRESH_TOKEN_CODE:
           const refreshPayload = await this.jwtService.verifyAsync(token, { secret: this.configService.get<string>(ConstantCodes.JWT_REFRESH_SECRET_KEY) });
           // Get user info/sign in again
           const user_ref = await this.getUserInfo(refreshPayload.data.email);
           if (!user_ref) {
-            return messages.TOKEN_VERIFICATION_FAILED;
+            return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
           }
           const { pw: _r, ...user_ref_info } = user_ref;
-          return user_ref_info;
+          return { success: true, data: { user_ref_info } };
         default:
-          return messages.TOKEN_VERIFICATION_FAILED;
+          return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
       }
     }
     catch (error) {
-      return error.name;
+      return { success: false, messages: error.name }
     }
   }
 
@@ -141,13 +141,19 @@ export class AuthService {
       //check refresh token valid/expired
       const user = await this.verifyToken(current_refresh_token, secret_code);
       // refresh token not valid or expired
-      if (!user) {
-        return messages.TOKEN_VERIFICATION_FAILED;
+      if (!user || !user.success || !user.data || !user.data.user_info) {
+        return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
       }
-      const { pw: _, ...user_info } = user;
-      const { token, refresh_token } = await this.generateToken(user.email, user.first_name, user.last_name);
-      return { user_info, token, refresh_token };
+
+      const user_info = user.data.user_info;
+
+      const { token, refresh_token } = await this.generateToken(
+        user_info.email,
+        user_info.first_name ?? 'user',
+        user_info.last_name ?? 'Mr/Mrs'
+      );
+      return { success: true, data: { user_info, token, refresh_token } }
     }
-    catch { return messages.TOKEN_VERIFICATION_FAILED; }
+    catch { return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED } }
   }
 }
