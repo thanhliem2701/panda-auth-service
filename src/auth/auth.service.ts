@@ -25,25 +25,26 @@ export class AuthService {
     const isMatch = await bcrypts.compare(pw, admin.pw);
     if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day
-    const { token } = await this.adminGenerateToken(
+    const { access_token } = await this.adminGenerateToken(
       admin.email,
       admin.first_name ?? 'admin',
-      admin.last_name ?? 'Mr'
+      admin.last_name ?? 'Mr',
+      admin.role?? 'ADMIN'
     )
     //take out password before return to client
     const { pw: _, ...admin_info } = admin;
-    return { success: true, data: { admin_info, token } }
+    return { success: true, data: { admin_info, access_token } }
   }
 
   //generate token expire in 1 day
-  async adminGenerateToken(email: string, first_name: string, last_name: string) {
+  async adminGenerateToken(email: string, first_name: string, last_name: string, role: string) {
     //Generate Access Token expire in 1 day
-    const token = await this.jwtService.signAsync({ data: { email, first_name, last_name } }, {
+    const access_token = await this.jwtService.signAsync({ data: { email, first_name, last_name, role } }, {
       algorithm: 'HS256',
       secret: this.configService.get<string>(ConstantCodes.JWT_SECRET_KEY),
       expiresIn: '1d'
     });
-    return { token }
+    return { access_token }
   }
   //Verify admin token
   async verifyAdminToken(token: string) {
@@ -77,20 +78,20 @@ export class AuthService {
     const isMatch = await bcrypts.compare(pw, user.pw);
     if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day and refresh token valid for 7 days
-    const { token, refresh_token } = await this.generateToken(
+    const { access_token, refresh_token } = await this.generateToken(
       user.email,
       user.first_name ?? 'user',
       user.last_name ?? 'Mr/Mrs'
     )
     //take out password before return to client
     const { pw: _, ...user_info } = user;
-    return { success: true, data: { user_info, token, refresh_token } }
+    return { success: true, data: { user_info, access_token, refresh_token } }
   }
 
   //Generate Token & refresh token valid in 7 days
   async generateToken(email: string, first_name: string, last_name: string) {
     //Generate Access Token expire in 1 day
-    const token = await this.jwtService.signAsync({ data: { email, first_name, last_name } }, {
+    const access_token = await this.jwtService.signAsync({ data: { email, first_name, last_name } }, {
       algorithm: 'HS256',
       secret: this.configService.get<string>(ConstantCodes.JWT_SECRET_KEY),
       expiresIn: '1d'
@@ -101,7 +102,7 @@ export class AuthService {
       secret: this.configService.get<string>(ConstantCodes.JWT_REFRESH_SECRET_KEY),
       expiresIn: '7d'
     });
-    return { token, refresh_token }
+    return { access_token, refresh_token }
   }
 
   //Verify token
@@ -140,19 +141,20 @@ export class AuthService {
     try {
       //check refresh token valid/expired
       const user = await this.verifyToken(current_refresh_token, secret_code);
+      
       // refresh token not valid or expired
-      if (!user || !user.success || !user.data || !user.data.user_info) {
+      if (!user || !user.success || !user.data || !user.data.user_ref_info) {
         return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
       }
 
-      const user_info = user.data.user_info;
+      const user_info = user.data.user_ref_info;
 
-      const { token, refresh_token } = await this.generateToken(
+      const { access_token, refresh_token } = await this.generateToken(
         user_info.email,
         user_info.first_name ?? 'user',
         user_info.last_name ?? 'Mr/Mrs'
       );
-      return { success: true, data: { user_info, token, refresh_token } }
+      return { success: true, data: { user_info, access_token, refresh_token } }
     }
     catch { return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED } }
   }
