@@ -17,23 +17,23 @@ export class AuthService {
   //Admin Sign In
   async adminSignIn(email: string, pw: string) {
     //check null
-    if (!email || !pw) return { success: false, messages: messages.EMAIL_PASSWORD_NULL }
+    if (!email || !pw) return { statusCode: 400, messages: messages.EMAIL_PASSWORD_NULL }
     //check email exist
     const admin = await this.Prisma.user_admin.findUnique({ where: { email } });
-    if (!admin) return { success: false, messages: messages.EMAIL_NOT_FOUND };
+    if (!admin) return { statusCode: 404, messages: messages.EMAIL_NOT_FOUND };
     //check password match
     const isMatch = await bcrypts.compare(pw, admin.pw);
-    if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
+    if (!isMatch) return { statusCode: 400, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day
     const { access_token } = await this.adminGenerateToken(
       admin.email,
       admin.first_name ?? 'admin',
       admin.last_name ?? 'Mr',
-      admin.role?? 'ADMIN'
+      admin.role ?? 'ADMIN'
     )
     //take out password before return to client
     const { pw: _, ...admin_info } = admin;
-    return { success: true, data: { admin_info, access_token } }
+    return { statusCode: 200, data: { admin_info, access_token } }
   }
 
   //generate token expire in 1 day
@@ -53,12 +53,12 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(token, { secret: this.configService.get<string>(ConstantCodes.JWT_SECRET_KEY) });
       // get user admin info
       const admin = await this.Prisma.user_admin.findUnique({ where: { email: payload.data.email } });
-      if (!admin) return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED };
+      if (!admin) return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED };
       const { pw: _, ...admin_info } = admin;
-      return { success: true, data: { admin_info } }
+      return { statusCode: 200, data: { admin_info } }
     }
     catch {
-      return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
+      return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED }
     }
   }
 
@@ -70,13 +70,13 @@ export class AuthService {
   // User sign in 
   async userSignIn(email: string, pw: string) {
     //Check null
-    if (!email || !pw) return { success: false, messages: messages.EMAIL_PASSWORD_NULL };
+    if (!email || !pw) return { statusCode: 400, messages: messages.EMAIL_PASSWORD_NULL };
     //check email exist
     const user = await this.getUserInfo(email);
-    if (!user) return { success: false, messages: messages.EMAIL_NOT_FOUND }
+    if (!user) return { statusCode: 404, messages: messages.EMAIL_NOT_FOUND }
     //check password match
     const isMatch = await bcrypts.compare(pw, user.pw);
-    if (!isMatch) return { success: false, messages: messages.PASSWORD_INCORRECT }
+    if (!isMatch) return { statusCode: 400, messages: messages.PASSWORD_INCORRECT }
     // generate Active token valid for 1 day and refresh token valid for 7 days
     const { access_token, refresh_token } = await this.generateToken(
       user.email,
@@ -85,7 +85,7 @@ export class AuthService {
     )
     //take out password before return to client
     const { pw: _, ...user_info } = user;
-    return { success: true, data: { user_info, access_token, refresh_token } }
+    return { statusCode: 200, data: { user_info, access_token, refresh_token } }
   }
 
   //Generate Token & refresh token valid in 7 days
@@ -114,25 +114,25 @@ export class AuthService {
           // Get user info/sign in again
           const user = await this.getUserInfo(accessPayload.data.email);
           if (!user) {
-            return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
+            return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED }
           }
           const { pw: _, ...user_info } = user;
-          return { success: true, data: { user_info } }
+          return { statusCode: 200, data: { user_info } }
         case ConstantCodes.REFRESH_TOKEN_CODE:
           const refreshPayload = await this.jwtService.verifyAsync(token, { secret: this.configService.get<string>(ConstantCodes.JWT_REFRESH_SECRET_KEY) });
           // Get user info/sign in again
           const user_ref = await this.getUserInfo(refreshPayload.data.email);
           if (!user_ref) {
-            return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
+            return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED }
           }
           const { pw: _r, ...user_ref_info } = user_ref;
-          return { success: true, data: { user_ref_info } };
+          return { statusCode: 200, data: { user_ref_info } };
         default:
-          return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
+          return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED }
       }
     }
     catch (error) {
-      return { success: false, messages: error.name }
+      return { statusCode: 500, messages: error.name }
     }
   }
 
@@ -141,10 +141,10 @@ export class AuthService {
     try {
       //check refresh token valid/expired
       const user = await this.verifyToken(current_refresh_token, secret_code);
-      
+
       // refresh token not valid or expired
-      if (!user || !user.success || !user.data || !user.data.user_ref_info) {
-        return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED }
+      if (!user || ![200, 201].includes(user.statusCode) || !user.data || !user.data.user_ref_info) {
+        return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED }
       }
 
       const user_info = user.data.user_ref_info;
@@ -154,8 +154,8 @@ export class AuthService {
         user_info.first_name ?? 'user',
         user_info.last_name ?? 'Mr/Mrs'
       );
-      return { success: true, data: { user_info, access_token, refresh_token } }
+      return { statusCode: 200, data: { user_info, access_token, refresh_token } }
     }
-    catch { return { success: false, messages: messages.TOKEN_VERIFICATION_FAILED } }
+    catch { return { statusCode: 401, messages: messages.TOKEN_VERIFICATION_FAILED } }
   }
 }
